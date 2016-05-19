@@ -1,0 +1,35 @@
+{
+  "name": "frankly",
+  "version": "1.0.0",
+  "description": "stupid simple docs for your express thing",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juristat-oss/frankly.git"
+  },
+  "keywords": [
+    "frankly",
+    "express",
+    "expressjs",
+    "express.js",
+    "rest",
+    "webapp",
+    "api",
+    "doc",
+    "docs",
+    "documentation",
+    "generator",
+    "doxygen",
+    "javadoc",
+    "jsdoc"
+  ],
+  "author": "Ben Chociej <ben.chociej@juristat.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/juristat-oss/frankly/issues"
+  },
+  "homepage": "https://github.com/juristat-oss/frankly#readme"
+}
