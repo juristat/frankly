@@ -1,6 +1,6 @@
 {
   "name": "frankly",
-  "version": "1.0.0",
+  "version": "0.0.1-pre1",
   "description": "stupid simple docs for your express thing",
   "main": "index.js",
   "scripts": {
