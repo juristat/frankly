@@ -20,6 +20,7 @@ limitations under the License.
 
 /** @module frankly/src/app-wrapper */
 
+import assert from 'assert';
 import express from 'express';
 import {parse as parseDoc} from 'doctrine';
 import methods from 'methods';
@@ -37,6 +38,24 @@ const ORIGINAL_EXPRESS_ROUTER_CTOR = express.Router;
  * walker component traverses the entire app routing tree to build a path-oriented data structure.
  *
  * Calling with `new` is not necessary; this is just a factory function.
+ *
+ * In general, routers (express.Router()) and apps (express()) are treated the same. In this code, I sometimes use the
+ * noun 'routerish' to refer to a variable that could be either one, but you can assume that the term 'router' could be
+ * an app or a router also.
+ *
+ * However, in the exported API, wrapApp() should only be used with apps, and registerRouter() and getRouterName()
+ * should only be used with routers.
+ *
+ * @example <caption>Basic usage</caption>
+ * let wrapper = Wrapper();
+ * let doc = wrapper.declareDoc;
+ * let app = wrapper.wrapApp(express());
+ *
+ * doc `
+ *     Hello world route
+ *     @returns 'hello world'
+ * `
+ * app.get('/', (req, res) => res.send('hello world'));
  */
 function Wrapper() {
 	const _layerDocs = new Map;
@@ -66,68 +85,94 @@ function Wrapper() {
 	};
 
 	/**
+	 * Get the routing stack from the specified app or router (routerish thing)
+	 * @private
+	 * @returns {Object} routing stack
+	 */
+	function _getStack(routerish) {
+		const stack = routerish._router ? routerish._router.stack : routerish.stack;
+		assert(Array.isArray(stack), 'stack is not an array');
+		return stack;
+	};
+
+	/**
 	 * Attach the most recently seen doc string to the current express.js method (e.g. an app.get(...))
 	 * @private
-	 * @this the original express.js Router or app being documented (not the facade)
-	 * @param {*[]} ...args - the entire args array used to define the method handler
 	 */
-	function _marryDocToSimpleMethodLayer(...args) {
-		// if args.length is 1, this is probably not a route method handler
-		// e.g. it could be a configuration call such as app.get('json spaces')
-		if(args.length >= 2 && _nextDoc) {
-			const stack = this._router ? this._router.stack : this.stack;
-			const thisLayer = stack[stack.length - 1];
+	function _marryDocToSimpleMethodLayer(routerish) {
+		return function(...args) {
+			// if args.length is 1, this is not a route method handler (e.g. app.get(property))
+			if(args.length >= 2 && _nextDoc) {
+				const stack = _getStack(routerish);
+				assert(stack.length > 0, 'stack is empty');
+				const routeLayer = stack[stack.length - 1];
+				assert(routeLayer && routeLayer.route && routeLayer.route.stack, 'routeLayer has no stack');
+				assert.equal(routeLayer.route.stack.length, 1, 'route stack should have only one layer');
 
-			_layerDocs.set(thisLayer, _nextDoc);
-			_nextDoc = null;
-		}
+				// target Layer is the only Layer on the Route stack, which is the latest Layer on the routerish stack
+				const thisLayer = routeLayer.route.stack[0];
+
+				_layerDocs.set(thisLayer, _nextDoc);
+				_nextDoc = null;
+			}
+		};
 	};
 
 	/**
 	 * Attach the most recently seen doc string to the current express.js route method (e.g. app.route(...).get(...))
 	 * @private
-	 * @this the original express.js Router or app being documented (not the facade)
-	 * @param {*[]} ...args - the entire args array used to define the router method handler
 	 */
-	function _marryDocToRouteMethodLayer(...args) {
-		if(_nextDoc) {
-			const thisLayer = '?'; throw new Error('i dunno lol'); // TODO
+	function _marryDocToRouteMethodLayer(route) {
+		return function(...args) {
+			if(_nextDoc) {
+				const stack = route.stack;
+				assert(stack && stack.length, 'route must have stuff on its stack');
 
-			_layerDocs.set(thisLayer, _nextDoc);
-			_nextDoc = null;
-		}
+				// target Layer is the latest Layer on the Route stack
+				const thisLayer = stack[stack.length] - 1;
+
+				_layerDocs.set(thisLayer, _nextDoc);
+				_nextDoc = null;
+			}
+		};
 	};
 
 	/**
-	 * Attach the most recently seen doc string to the current express.js route (i.e. an app.route(...))
+	 * Attach the most recently seen doc string to the current express.js route (i.e. router.route(...))
 	 * @private
-	 * @this the original express.js Router or app being documented (not the facade)
-	 * @param {*[]} ...args - the entire args array used to define the route
 	 */
-	function _marryDocToRoute(...args) {
-		if(_nextDoc) {
-			const stack = this._router ? this._router.stack : this.stack;
-			const thisLayer = stack[stack.length - 1]; throw new Error('this is probably right but I DUNNO LOL'); // TODO
+	function _marryDocToRoute(routerish) {
+		return function(...args) {
+			if(_nextDoc) {
+				const stack = _getStack(routerish);
+				assert(stack.length > 0, 'stack is empty');
 
-			_layerDocs.set(thisLayer, _nextDoc);
-			_nextDoc = null;
-		}
+				// target Layer is the latest Layer on the routerish stack (a Route middleware Layer)
+				const thisLayer = stack[stack.length - 1];
+
+				_layerDocs.set(thisLayer, _nextDoc);
+				_nextDoc = null;
+			}
+		};
 	};
 
 	/**
-	 * Attach the most recently seen doc string to the current express.js middleware (i.e. an app.use(...))
+	 * Attach the most recently seen doc string to the current express.js middleware (i.e. router.use(...))
 	 * @private
-	 * @this the original express.js Router or app being documented (not the facade)
-	 * @param {*[]} ...args - the entire args array used to define the route
 	 */
-	function _marryDocToMiddleware(...args) {
-		if(_nextDoc) {
-			const stack = this._router ? this._router.stack : this.stack;
-			const thisLayer = stack[stack.length - 1]; throw new Error('this might be right but I DUNNO LOL'); // TODO
+	function _marryDocToMiddleware(routerish) {
+		return function(...args) {
+			if(_nextDoc) {
+				const stack = _getStack(routerish);
+				assert(stack.length > 0, 'stack is empty');
 
-			_layerDocs.set(thisLayer, _nextDoc);
-			_nextDoc = null;
-		}
+				// target Layer is the latest Layer on the routerish stack (an arbitrary middleware Layer)
+				const thisLayer = stack[stack.length - 1];
+
+				_layerDocs.set(thisLayer, _nextDoc);
+				_nextDoc = null;
+			}
+		};
 	};
 
 	/**
@@ -156,7 +201,7 @@ function Wrapper() {
 	 */
 	function _hookHttpMethods(facade, original) {
 		for(let httpMethod of methods.concat('all')) {
-			_hookFacadeMethod(facade, original, httpMethod, _marryDocToSimpleMethodLayer);
+			_hookFacadeMethod(facade, original, httpMethod, _marryDocToSimpleMethodLayer(original));
 		}
 	};
 
@@ -167,7 +212,7 @@ function Wrapper() {
 	 * @param {Router|app} original - the target Router or method
 	 */
 	function _hookMiddlewareMethods(facade, original) {
-		_hookFacadeMethod(facade, original, 'use', _marryDocToMiddleware);
+		_hookFacadeMethod(facade, original, 'use', _marryDocToMiddleware(original));
 	};
 
 	/**
@@ -176,13 +221,15 @@ function Wrapper() {
 	 * @param {Router|app} facade - the facade object to hold the hooked methods
 	 * @param {Router|app} original - the target Router or method
 	 */
-	function _hookHttpMethods(facade, original) {
+	function _hookRouteMethods(facade, original) {
 		facade.route = function(...args) {
 			const origRoute = original.route.apply(original, args);
 			const facadeRoute = Object.create(origRoute);
 
+			_marryDocToRoute(original)(...args);
+
 			for(let httpMethod of methods.concat('all')) {
-				_hookFacadeMethod(facadeRoute, origRoute, httpMethod, _marryDocToRouteMethodLayer)
+				_hookFacadeMethod(facadeRoute, origRoute, httpMethod, _marryDocToRouteMethodLayer(origRoute));
 			}
 
 			return facadeRoute;
@@ -285,6 +332,9 @@ function Wrapper() {
 	function wrapApp(app) {
 		return _wrapRouterOrApp(app);
 	};
+
+	// TODO: function app() { returns a new wrapped express() app }
+	// TODO: function hookExpress() { hooks the express() and express.Router() ctors globally, for convenience }
 
 	/**
 	 * Get the parsed JSDoc associated with the specified layer
