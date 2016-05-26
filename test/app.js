@@ -1,7 +1,8 @@
-import express, { Router } from 'express';
+import express from 'express';
 import frankly from '../src/index.js';
 
-let app = frankly.app(express());
+const app = frankly.wrapApp(express());
+const doc = frankly.declareDoc;
 
 /*
 for(let key in app) {
@@ -16,21 +17,21 @@ for(let key in app) {
 }
 */
 
-const basicRouter      = Router();
-const routedRouter     = Router();
-const recursiveRouter  = Router();
-const paramRouter      = Router();
-const allRouter        = Router();
-const paramInUseRouter = Router();
-const chainGetRouter   = Router();
+const basicRouter      = frankly.Router('basic');
+const routedRouter     = frankly.Router('routed');
+const recursiveRouter  = frankly.Router('recursive');
+const paramRouter      = frankly.Router('param');
+const allRouter        = frankly.Router('all');
+const paramInUseRouter = frankly.Router('paramInUse');
+const chainGetRouter   = frankly.Router('chainGet');
 
-frankly `User`
+doc `User`
 app.use('/', function thisIsAUseRoute(req, res, next) { next() });
 
-frankly `Says 'hello world'.`
+doc `Says 'hello world'.`
 app.get('/',         (req, res, next) => next(), (req, res) => res.send('hello world'));
 
-frankly `Posts something?
+doc `Posts something?
 	@param {query} what`
 app.post('/',        (req, res) => res.send('post ' + req.query.what));
 

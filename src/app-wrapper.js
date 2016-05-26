@@ -59,8 +59,8 @@ const ORIGINAL_EXPRESS_ROUTER_CTOR = express.Router;
  */
 function Wrapper() {
 	const _layerDocs = new Map;
-	const _routers   = new Map;
-	const _facades   = new WeakSet;
+	const _routerNames = new Map;
+	const _facades = new WeakMap;
 
 	let _nextDoc;
 
@@ -105,12 +105,11 @@ function Wrapper() {
 			if(args.length >= 2 && _nextDoc) {
 				const stack = _getStack(routerish);
 				assert(stack.length > 0, 'stack is empty');
-				const routeLayer = stack[stack.length - 1];
-				assert(routeLayer && routeLayer.route && routeLayer.route.stack, 'routeLayer has no stack');
-				assert.equal(routeLayer.route.stack.length, 1, 'route stack should have only one layer');
 
-				// target Layer is the only Layer on the Route stack, which is the latest Layer on the routerish stack
-				const thisLayer = routeLayer.route.stack[0];
+				// target Layer is the latest Layer on the stack, which has one or more method handler Layer children
+				const thisLayer = stack[stack.length - 1];
+
+				assert(thisLayer && thisLayer.route && thisLayer.route.stack, 'simple method layer has no stack');
 
 				_layerDocs.set(thisLayer, _nextDoc);
 				_nextDoc = null;
@@ -244,13 +243,19 @@ function Wrapper() {
 	function _wrapRouterOrApp(target) {
 		if(_facades.has(target)) return target;
 
-		const facade = Object.create(target);
+		let facade;
+		if(typeof target === 'function') {
+			facade = (...args) => target.apply(target, args);
+			Object.setPrototypeOf(facade, target);
+		} else {
+			facade = Object.create(target);
+		}
 
 		_hookHttpMethods(facade, target);       // HTTP verbs + 'all'
 		_hookMiddlewareMethods(facade, target); // 'use' - for middlewares
 		_hookRouteMethods(facade, target);      // for when app.route(...) is used
 
-		_facades.add(facade);
+		_facades.set(facade, target);
 
 		return facade;
 	};
@@ -287,7 +292,7 @@ function Wrapper() {
 			name = null;
 		}
 
-		_routers.set(router, name);
+		_routerNames.set(router, name);
 		return _wrapRouterOrApp(router);
 	};
 
@@ -353,7 +358,7 @@ function Wrapper() {
 	 * @returns {string|undefined} - the name of the router, or undefined if it has not been registered
 	 */
 	function getRouterName(router) {
-		return _routers.get(_facades.get(router) || router);
+		return _routerNames.get(_facades.get(router) || router);
 	};
 
 	return {
@@ -364,7 +369,8 @@ function Wrapper() {
 		unhookRouterCtor,
 		wrapApp,
 		getLayerDoc,
-		getRouterName
+		getRouterName,
+		dump: () => {return {routers: _routerNames, docs: _layerDocs}}
 	};
 };
 

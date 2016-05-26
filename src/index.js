@@ -24,6 +24,23 @@ import Wrapper from './app-wrapper';
 import {getDocTree} from './app-walker';
 import {render, serve} from './render';
 
+/*
+	maybe, TODO, this alternative form:
+
+	app
+		.doc `
+			JSDoc here
+		`
+		.get('/', ...)
+
+		.doc `...`
+		.put('/', ...)
+
+
+	And same for app.route(), Router, etc
+*/
+
+
 /**
  * frankly constructor; returns a new instance of frankly API.
  * @constructor
@@ -32,7 +49,10 @@ function Frankly() {
 	const wrapper = Wrapper();
 
 	const publicApi = {
-
+		declareDoc: wrapper.declareDoc,
+		wrapApp: wrapper.wrapApp,
+		Router: wrapper.Router,
+		dump: wrapper.dump
 	};
 
 	return publicApi;

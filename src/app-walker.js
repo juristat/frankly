@@ -18,8 +18,76 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// gonna have to revive this for doc generation maybe (TODO)
-// THIS IS OLD AND BUSTED; REWRITE
+
+
+/*
+	Battle plan.
+
+	1. Push app._router onto a list
+	2. While the list is not empty:
+		A. Get the first router from the list
+		B. Traverse that router:
+			i. Walk the tree of Layers, building up path information as a vector of path elements
+			ii. Listen for emits from later steps and store them in order in a succinct data structure for the current
+				router being traversed
+			ii. If any Layer has a layerDoc or is a Router middleware layer:
+				true)
+					a. emit the path and route/method/router/middleware info along with the layerDoc and
+						meta-information (filename? other info?)
+					b. If this Layer is a Router middleware Layer and the Router has not yet been traversed:
+						true) push it onto the list.
+	3. Assemble the data structures generated from 2.B.ii. into a single report for export, rendering, etc.
+*/
+
+// a layer has .route, .method, .handleor .stack
+// worry about: path keys regexp handle
+function _process(layer, routeElements) {
+	if(layer.path) {
+		routeElements = routeElements.concat(layer.path);
+	} else if(layer.regexp) {
+		routeElements = routeElements.concat(layer.regexp);
+	}
+
+	if(layer.method) {
+		// HTTP verb Layer
+		// leaf node! yay
+		// emit: routeElements + layer.method + doc-if-any
+	} else if(layer.route) {
+		// Route Layer
+		// recurse: each in layer.route.stack
+		// emit: routeElements + doc-if-any
+	} else if(layer.stack) {
+		// top level of a Router
+		// recurse: each in layer.stack
+		// emit: routeElements + doc-if-any.
+
+		// TODO: are we attaching docs here yet?
+		// e.g. doc `A cool router` Router('name');
+	} else if(layer.handle && layer.name === 'router') {
+		// Router middleware Layer
+		// push layer.handle onto todo list if not already in done list
+		// emit routeElements + ref-to-router + doc-if-any
+	} else if(layer.handle) {
+		// regular middleware layer
+		// leaf node! yay!
+		// emit routeElements + layer.name-if-any + doc-if-any
+
+		// TODO: allow extensibility here?
+	}
+};
+
+function walk(app) {
+	const todo = [app._router];
+	const done = [];
+
+	for(let current of todo) {
+		let result = _process(current, ['/']);
+	}
+};
+
+
+/*
+// THIS IS OLD AND BUSTED
 function walkEntireApp(target) {
 	const knownRouters = new Map;
 
@@ -134,3 +202,4 @@ function getRouteList(api) {
 	walkers.app(api);
 	return routes;
 }
+*/
