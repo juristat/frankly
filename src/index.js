@@ -21,7 +21,7 @@ limitations under the License.
 /** @module frankly */
 
 import Wrapper from './app-wrapper';
-import {getDocTree} from './app-walker';
+import Walker from './app-walker';
 import {render, serve} from './render';
 
 /*
@@ -53,7 +53,8 @@ function Frankly() {
 		declareDoc: wrapper.declareDoc,
 		wrapApp: wrapper.wrapApp,
 		Router: wrapper.Router,
-		dump: wrapper.dump
+		dump: wrapper.dump,
+		walk: walker.walk
 	};
 
 	return publicApi;

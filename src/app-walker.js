@@ -42,56 +42,135 @@ limitations under the License.
 function Walker(wrapper) {
 	// a layer has .route, .method, .handleor .stack
 	// worry about: path keys regexp handle
-	function _process(topLayer, pathElements, emit) {
-		if(layer.path) {
-			pathElements = pathElements.concat(layer.path);
-		} else if(layer.regexp) {
-			pathElements = pathElements.concat(layer.regexp);
-		}
+	function _process(layer, pathElements, emit, emitRouter) {
+		pathElements = pathElements.concat({
+			path: layer.path,
+			regexp: layer.regexp,
+			keys: layer.keys
+		});
+
+		const doc = wrapper.getLayerDoc(layer);
 
 		if(layer.method) {
-			// HTTP verb Layer
-			// leaf node! yay
-			// emit: pathElements + layer.method + doc-if-any
-		} else if(layer.route) {
+			console.dir({METHOD: layer}, {depth:null, colors:true});
+			// HTTP verb Layer (leaf node)
+			// emit: pathElements + layer.method + doc-if-any + method
+
+			emit({
+				type:   'method',
+				path:   pathElements,
+				method: layer.method,
+				doc:    doc
+			});
+
+		} else if(layer.route && typeof layer.route !== 'function') {
+			console.dir({ROUTE: layer}, {depth:null, colors:true});
 			// Route Layer
 			// recurse: each in layer.route.stack
-			// emit: pathElements + doc-if-any
-		} else if(layer.stack) {
+			// emit-if-doc: pathElements + doc-if-any + Route
+
+			if(doc) {
+				emit({
+					type:  'route',
+					path:  pathElements,
+					route: layer.route,
+					doc:   doc
+				});
+			}
+
+			layer.route.stack.forEach((layer) => _process(layer, pathElements, emit, emitRouter));
+
+		} else if(layer.stack || layer._router.stack) {
+			console.dir({ROUTERISH: layer}, {depth:null, colors:true});
 			// top level of a Router
 			// recurse: each in layer.stack
-			// emit: pathElements + doc-if-any.
+			// emit: pathElements + doc-if-any + router-name
 
-			// TODO: are we attaching docs here yet?
+			// TODO: add Wrapper ability to document a router?
 			// e.g. doc `A cool router` Router('name');
-		} else if(layer.handle && layer.name === 'router') {
-			// Router middleware Layer
-			// push layer.handle onto todo list if not already in done list
-			// emit pathElements + ref-to-router + doc-if-any
-		} else if(layer.handle) {
-			// regular middleware layer
-			// leaf node! yay!
-			// emit pathElements + layer.name-if-any + doc-if-any
 
-			// TODO: allow extensibility here?
+			const router = layer.stack ? layer : layer._router;
+			const name = wrapper.getRouterName(router);
+
+			emit({
+				type:       layer._router ? 'app' : 'router',
+				path:       pathElements,
+				routerName: name,
+				doc:        doc
+			});
+
+			router.stack.forEach((layer) => _process(layer, pathElements, emit, emitRouter));
+
+		} else if(layer.handle && layer.name === 'router') {
+			console.dir({ROUTER_REF: layer}, {depth:null, colors:true});
+			// Router middleware Layer (leaf node)
+			// push layer.handle onto todo list if not already in done list
+			// emit pathElements + ref-to-router + doc-if-any + router-name
+
+			// NB: this doc will not be the doc for the router, but for the .use(router) call
+
+			const name = wrapper.getRouterName(layer.handle);
+
+			emit({
+				type:       'router-ref',
+				path:       pathElements,
+				routerName: name,
+				doc:        doc
+			});
+
+			emitRouter(layer.handle);
+
+		} else if(layer.handle) {
+			console.dir({MIDDLEWARE: layer}, {depth:null, colors:true});
+			// regular middleware layer (leaf node)
+			// emit pathElements + layer.name-if-any + doc-if-any + handle
+
+			emit({
+				type:   'middleware',
+				path:   pathElements,
+				handle: layer.handle,
+				doc:    doc
+			});
 		}
 	};
 
 	function walk(routerish) {
-		if(routerish._router) routerish = routerish._router;
-
 		const todo = [routerish];
 		const done = new Map;
 
 		for(let current of todo) {
-			const docs = {}; // TODO: some kind of doc tree structure? Maybe add it into the recursion?
-			_process(current, ['/'], (doc) => undefined /* TODO */);
+			const docs = []; // TODO: some kind of doc tree structure? Maybe add it into the recursion?
+
+			_process(
+				current,
+				[{path: '/'}],
+				function emit(doc) { docs.push(doc); },
+				function emitRouter(router) {
+					console.error('emitted router');
+					if(!done.has(router)) todo.push(router);
+				}
+			);
+
 			done.set(current, docs);
 		}
+
+		const output = [];
+
+		done.forEach(function(routerish, docs) {
+			output.push({
+				type: routerish._router ? 'app' : 'router',
+				name: routerish._router ? '<app>' : (wrapper.getRouterName(routerish) || '<unnamed>'),
+				docs: docs
+			});
+		});
+
+		return output;
 	};
 
 	return {walk};
 };
+
+export default Walker;
 
 
 /*

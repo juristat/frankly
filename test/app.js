@@ -1,7 +1,8 @@
 import express from 'express';
 import frankly from '../src/index.js';
 
-const app = frankly.wrapApp(express());
+const unwrapped = express();
+const app = frankly.wrapApp(unwrapped);
 const doc = frankly.declareDoc;
 
 /*
@@ -71,4 +72,4 @@ app.use('/all/',                 allRouter);
 app.use('/param-in-use/:param/', paramInUseRouter);
 app.use('/chain/',               chainGetRouter);
 
-export { app };
+export { app, unwrapped };
