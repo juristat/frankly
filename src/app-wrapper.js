@@ -360,7 +360,7 @@ function Wrapper() {
 	function getRouterName(router) {
 		return _routerNames.get(_facades.get(router) || router);
 	};
-
+	
 	return {
 		declareDoc,
 		registerRouter,

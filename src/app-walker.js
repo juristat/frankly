@@ -39,50 +39,58 @@ limitations under the License.
 	3. Assemble the data structures generated from 2.B.ii. into a single report for export, rendering, etc.
 */
 
-// a layer has .route, .method, .handleor .stack
-// worry about: path keys regexp handle
-function _process(layer, routeElements) {
-	if(layer.path) {
-		routeElements = routeElements.concat(layer.path);
-	} else if(layer.regexp) {
-		routeElements = routeElements.concat(layer.regexp);
-	}
+function Walker(wrapper) {
+	// a layer has .route, .method, .handleor .stack
+	// worry about: path keys regexp handle
+	function _process(topLayer, pathElements, emit) {
+		if(layer.path) {
+			pathElements = pathElements.concat(layer.path);
+		} else if(layer.regexp) {
+			pathElements = pathElements.concat(layer.regexp);
+		}
 
-	if(layer.method) {
-		// HTTP verb Layer
-		// leaf node! yay
-		// emit: routeElements + layer.method + doc-if-any
-	} else if(layer.route) {
-		// Route Layer
-		// recurse: each in layer.route.stack
-		// emit: routeElements + doc-if-any
-	} else if(layer.stack) {
-		// top level of a Router
-		// recurse: each in layer.stack
-		// emit: routeElements + doc-if-any.
+		if(layer.method) {
+			// HTTP verb Layer
+			// leaf node! yay
+			// emit: pathElements + layer.method + doc-if-any
+		} else if(layer.route) {
+			// Route Layer
+			// recurse: each in layer.route.stack
+			// emit: pathElements + doc-if-any
+		} else if(layer.stack) {
+			// top level of a Router
+			// recurse: each in layer.stack
+			// emit: pathElements + doc-if-any.
 
-		// TODO: are we attaching docs here yet?
-		// e.g. doc `A cool router` Router('name');
-	} else if(layer.handle && layer.name === 'router') {
-		// Router middleware Layer
-		// push layer.handle onto todo list if not already in done list
-		// emit routeElements + ref-to-router + doc-if-any
-	} else if(layer.handle) {
-		// regular middleware layer
-		// leaf node! yay!
-		// emit routeElements + layer.name-if-any + doc-if-any
+			// TODO: are we attaching docs here yet?
+			// e.g. doc `A cool router` Router('name');
+		} else if(layer.handle && layer.name === 'router') {
+			// Router middleware Layer
+			// push layer.handle onto todo list if not already in done list
+			// emit pathElements + ref-to-router + doc-if-any
+		} else if(layer.handle) {
+			// regular middleware layer
+			// leaf node! yay!
+			// emit pathElements + layer.name-if-any + doc-if-any
 
-		// TODO: allow extensibility here?
-	}
-};
+			// TODO: allow extensibility here?
+		}
+	};
 
-function walk(app) {
-	const todo = [app._router];
-	const done = [];
+	function walk(routerish) {
+		if(routerish._router) routerish = routerish._router;
 
-	for(let current of todo) {
-		let result = _process(current, ['/']);
-	}
+		const todo = [routerish];
+		const done = new Map;
+
+		for(let current of todo) {
+			const docs = {}; // TODO: some kind of doc tree structure? Maybe add it into the recursion?
+			_process(current, ['/'], (doc) => undefined /* TODO */);
+			done.set(current, docs);
+		}
+	};
+
+	return {walk};
 };
 
 

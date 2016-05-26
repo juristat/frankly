@@ -47,6 +47,7 @@ import {render, serve} from './render';
  */
 function Frankly() {
 	const wrapper = Wrapper();
+	const walker = Walker(wrapper);
 
 	const publicApi = {
 		declareDoc: wrapper.declareDoc,
