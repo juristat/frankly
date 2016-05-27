@@ -119,7 +119,8 @@ function Walker(wrapper) {
 				type:       'router-ref',
 				pathChain:  pathElements,
 				routerName: name,
-				router:     layer.handle,
+				//router:     layer.handle,
+				//TODO serial number as per comment in index.js
 				jsdoc:      doc
 			});
 
