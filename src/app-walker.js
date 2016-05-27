@@ -44,7 +44,7 @@ function Walker(wrapper) {
 	// worry about: path keys regexp handle
 	function _process(layer, pathElements, emit, emitRouter) {
 		const nextElem = {
-			path: (layer._router ? layer.mountpath : layer.path) || (layer.regexp ? undefined : '/'),
+			path: (layer._router ? undefined : layer.path) || layer.regexp || (layer.mountpath ? undefined : '/'),
 			mountpath: layer.mountpath,
 			regexp: layer.regexp,
 			keys: layer.keys
@@ -67,7 +67,7 @@ function Walker(wrapper) {
 				type:      'method',
 				pathChain: pathElements,
 				method:    layer.method,
-				doc:       doc
+				jsdoc:     doc
 			});
 
 		} else if(!!layer.route && typeof layer.route !== 'function') {
@@ -80,7 +80,7 @@ function Walker(wrapper) {
 					type:      'route',
 					pathChain: pathElements,
 					route:     layer.route,
-					doc:       doc
+					jsdoc:     doc
 				});
 			}
 
@@ -101,7 +101,7 @@ function Walker(wrapper) {
 				type:       layer._router ? 'app' : 'router',
 				pathChain:  pathElements,
 				routerName: name,
-				doc:        doc
+				jsdoc:      doc
 			});
 
 			router.stack.forEach((layer) => _process(layer, pathElements, emit, emitRouter));
@@ -120,7 +120,7 @@ function Walker(wrapper) {
 				pathChain:  pathElements,
 				routerName: name,
 				router:     layer.handle,
-				doc:        doc
+				jsdoc:      doc
 			});
 
 			emitRouter(layer.handle);
@@ -133,7 +133,7 @@ function Walker(wrapper) {
 				type:      'middleware',
 				pathChain: pathElements,
 				handle:    layer.handle,
-				doc:       doc
+				jsdoc:     doc
 			});
 		}
 	};
@@ -152,7 +152,7 @@ function Walker(wrapper) {
 					for(let key in docObj) {
 						if(typeof docObj[key] === 'undefined') delete docObj[key];
 					}
-					
+
 					docs.push(docObj);
 				},
 				function emitRouter(router) { if(!done.has(router)) todo.push(router); }
