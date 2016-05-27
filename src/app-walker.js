@@ -40,48 +40,53 @@ limitations under the License.
 */
 
 function Walker(wrapper) {
-	// a layer has .route, .method, .handleor .stack
+	// a layer has .route, .method, .handle or .stack
 	// worry about: path keys regexp handle
 	function _process(layer, pathElements, emit, emitRouter) {
-		pathElements = pathElements.concat({
-			path: layer.path,
+		const nextElem = {
+			path: (layer._router ? layer.mountpath : layer.path) || (layer.regexp ? undefined : '/'),
+			mountpath: layer.mountpath,
 			regexp: layer.regexp,
 			keys: layer.keys
-		});
+		};
+
+		for(let key in nextElem) {
+			if(typeof nextElem[key] === 'undefined') delete nextElem[key];
+			if(Array.isArray(nextElem[key]) && nextElem[key].length === 0) delete nextElem[key];
+		}
+
+		pathElements = pathElements.concat(nextElem);
 
 		const doc = wrapper.getLayerDoc(layer);
 
 		if(layer.method) {
-			console.dir({METHOD: layer}, {depth:null, colors:true});
 			// HTTP verb Layer (leaf node)
 			// emit: pathElements + layer.method + doc-if-any + method
 
 			emit({
-				type:   'method',
-				path:   pathElements,
-				method: layer.method,
-				doc:    doc
+				type:      'method',
+				pathChain: pathElements,
+				method:    layer.method,
+				doc:       doc
 			});
 
-		} else if(layer.route && typeof layer.route !== 'function') {
-			console.dir({ROUTE: layer}, {depth:null, colors:true});
+		} else if(!!layer.route && typeof layer.route !== 'function') {
 			// Route Layer
 			// recurse: each in layer.route.stack
 			// emit-if-doc: pathElements + doc-if-any + Route
 
 			if(doc) {
 				emit({
-					type:  'route',
-					path:  pathElements,
-					route: layer.route,
-					doc:   doc
+					type:      'route',
+					pathChain: pathElements,
+					route:     layer.route,
+					doc:       doc
 				});
 			}
 
 			layer.route.stack.forEach((layer) => _process(layer, pathElements, emit, emitRouter));
 
-		} else if(layer.stack || layer._router.stack) {
-			console.dir({ROUTERISH: layer}, {depth:null, colors:true});
+		} else if(layer.stack || (layer._router && layer._router.stack)) {
 			// top level of a Router
 			// recurse: each in layer.stack
 			// emit: pathElements + doc-if-any + router-name
@@ -94,7 +99,7 @@ function Walker(wrapper) {
 
 			emit({
 				type:       layer._router ? 'app' : 'router',
-				path:       pathElements,
+				pathChain:  pathElements,
 				routerName: name,
 				doc:        doc
 			});
@@ -102,7 +107,6 @@ function Walker(wrapper) {
 			router.stack.forEach((layer) => _process(layer, pathElements, emit, emitRouter));
 
 		} else if(layer.handle && layer.name === 'router') {
-			console.dir({ROUTER_REF: layer}, {depth:null, colors:true});
 			// Router middleware Layer (leaf node)
 			// push layer.handle onto todo list if not already in done list
 			// emit pathElements + ref-to-router + doc-if-any + router-name
@@ -113,23 +117,23 @@ function Walker(wrapper) {
 
 			emit({
 				type:       'router-ref',
-				path:       pathElements,
+				pathChain:  pathElements,
 				routerName: name,
+				router:     layer.handle,
 				doc:        doc
 			});
 
 			emitRouter(layer.handle);
 
 		} else if(layer.handle) {
-			console.dir({MIDDLEWARE: layer}, {depth:null, colors:true});
 			// regular middleware layer (leaf node)
 			// emit pathElements + layer.name-if-any + doc-if-any + handle
 
 			emit({
-				type:   'middleware',
-				path:   pathElements,
-				handle: layer.handle,
-				doc:    doc
+				type:      'middleware',
+				pathChain: pathElements,
+				handle:    layer.handle,
+				doc:       doc
 			});
 		}
 	};
@@ -143,12 +147,15 @@ function Walker(wrapper) {
 
 			_process(
 				current,
-				[{path: '/'}],
-				function emit(doc) { docs.push(doc); },
-				function emitRouter(router) {
-					console.error('emitted router');
-					if(!done.has(router)) todo.push(router);
-				}
+				[],
+				function emit(docObj) {
+					for(let key in docObj) {
+						if(typeof docObj[key] === 'undefined') delete docObj[key];
+					}
+					
+					docs.push(docObj);
+				},
+				function emitRouter(router) { if(!done.has(router)) todo.push(router); }
 			);
 
 			done.set(current, docs);
@@ -156,10 +163,10 @@ function Walker(wrapper) {
 
 		const output = [];
 
-		done.forEach(function(routerish, docs) {
+		done.forEach(function(docs, routerish) {
 			output.push({
-				type: routerish._router ? 'app' : 'router',
-				name: routerish._router ? '<app>' : (wrapper.getRouterName(routerish) || '<unnamed>'),
+				type: routerish.stack ? 'router' : 'app',
+				name: routerish.stack ? (wrapper.getRouterName(routerish) || '<unnamed>') : '<app>',
 				docs: docs
 			});
 		});

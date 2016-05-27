@@ -24,6 +24,8 @@ import Wrapper from './app-wrapper';
 import Walker from './app-walker';
 import {render, serve} from './render';
 
+// TODO: wrapper needs to give Routers serial numbers since they won't always be named; walker needs to refer to S/Ns
+
 /*
 	maybe, TODO, this alternative form:
 

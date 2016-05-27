@@ -243,13 +243,19 @@ function Wrapper() {
 	function _wrapRouterOrApp(target) {
 		if(_facades.has(target)) return target;
 
-		let facade;
-		if(typeof target === 'function') {
-			facade = (...args) => target.apply(target, args);
-			Object.setPrototypeOf(facade, target);
-		} else {
-			facade = Object.create(target);
+		if(typeof target !== 'function') {
+			throw new TypeError('target should be a router or app function');
 		}
+
+		let facade;
+
+		if(target.stack) {
+			facade = function router(...args) { return target.apply(target, args); }
+		} else {
+			facade = function app(...args) { return target.apply(target, args); }
+		}
+
+		Object.setPrototypeOf(facade, target);
 
 		_hookHttpMethods(facade, target);       // HTTP verbs + 'all'
 		_hookMiddlewareMethods(facade, target); // 'use' - for middlewares
@@ -360,7 +366,7 @@ function Wrapper() {
 	function getRouterName(router) {
 		return _routerNames.get(_facades.get(router) || router);
 	};
-	
+
 	return {
 		declareDoc,
 		registerRouter,
