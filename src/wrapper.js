@@ -1,7 +1,7 @@
 /*!
 Project: frankly
 Author: Ben Chociej <ben.chociej@juristat.com>
-File: src/app-wrapper.js
+File: src/wrapper.js
 
 Copyright 2016 Datanalytics, Inc.
 
@@ -18,11 +18,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/** @module frankly/src/app-wrapper */
+/** @module frankly/src/wrapper */
 
 import assert from 'assert';
 import express from 'express';
-import {parse as parseDoc} from 'doctrine';
 import methods from 'methods';
 
 const ORIGINAL_EXPRESS_ROUTER_CTOR = express.Router;
@@ -58,10 +57,19 @@ const ORIGINAL_EXPRESS_ROUTER_CTOR = express.Router;
  * app.get('/', (req, res) => res.send('hello world'));
  */
 function Wrapper() {
+	/** map of Layer objects to their JSDoc strings @private */
 	const _layerDocs = new Map;
+
+	/** list of all known Router; _routers.indexOf() is used to unambiguously reference a Router later @private */
+	const _routers = [];
+
+	/** users can specify a human-consumable name for a Router; it is stored here @private */
 	const _routerNames = new Map;
+
+	/** GC-friendly map of facade objects to their original underlying objects @private */
 	const _facades = new WeakMap;
 
+	/** a parking spot for the most recent doc string; to be glued to the next Layer, more or less @private */
 	let _nextDoc;
 
 	/**
@@ -93,6 +101,17 @@ function Wrapper() {
 		const stack = routerish._router ? routerish._router.stack : routerish.stack;
 		assert(Array.isArray(stack), 'stack is not an array');
 		return stack;
+	};
+
+	/**
+	 * Attach the most recently seen doc string to the current express.js app or Router
+	 * @private
+	 */
+	function _marryDocToRouterish(routerish) {
+		if(_nextDoc) {
+			_layerDocs.set(routerish, _nextDoc);
+			_nextDoc = null;
+		}
 	};
 
 	/**
@@ -128,9 +147,10 @@ function Wrapper() {
 				assert(stack && stack.length, 'route must have stuff on its stack');
 
 				// target Layer is the latest Layer on the Route stack
-				const thisLayer = stack[stack.length] - 1;
+				const thisLayer = stack[stack.length - 1];
 
 				_layerDocs.set(thisLayer, _nextDoc);
+
 				_nextDoc = null;
 			}
 		};
@@ -182,13 +202,17 @@ function Wrapper() {
 	 * @param {string} methodName - the name of the method to hook
 	 * @param {function} hookFn - the function to call when the facade receives a call to the specified method
 	 */
-	function _hookFacadeMethod(facade, original, methodName, hookFn) {
+	function _hookFacadeMethod(facade, original, methodName, hookFn, returnOverride) {
 		if(typeof original[methodName] !== 'function') return;
 
 		facade[methodName] = function(...args) {
-			const result = original[methodName].apply(original, args);
-			hookFn.apply(original, args);
-			return result;
+			const origResult = original[methodName].apply(original, args);
+			const facadeResult = hookFn.apply(original, args);
+			_nextDoc = null;
+
+			if(returnOverride === true) return facadeResult;
+			if(!!returnOverride) return returnOverride;
+			return origResult;
 		};
 	};
 
@@ -222,14 +246,20 @@ function Wrapper() {
 	 */
 	function _hookRouteMethods(facade, original) {
 		facade.route = function(...args) {
+			console.error('facade.route');
 			const origRoute = original.route.apply(original, args);
 			const facadeRoute = Object.create(origRoute);
 
 			_marryDocToRoute(original)(...args);
 
 			for(let httpMethod of methods.concat('all')) {
-				_hookFacadeMethod(facadeRoute, origRoute, httpMethod, _marryDocToRouteMethodLayer(origRoute));
+				_hookFacadeMethod(facadeRoute, origRoute, httpMethod, _marryDocToRouteMethodLayer(origRoute), facadeRoute);
 			}
+
+			facadeRoute.doc = function(strings, ...values) {
+				declareDoc(strings, ...values);
+				return facadeRoute;
+			};
 
 			return facadeRoute;
 		};
@@ -250,6 +280,7 @@ function Wrapper() {
 		let facade;
 
 		if(target.stack) {
+			if(_routers.indexOf(target) === -1) _routers.push(target);
 			facade = function router(...args) { return target.apply(target, args); }
 		} else {
 			facade = function app(...args) { return target.apply(target, args); }
@@ -263,6 +294,8 @@ function Wrapper() {
 
 		_facades.set(facade, target);
 
+		_marryDocToRouterish(facade);
+
 		return facade;
 	};
 
@@ -274,7 +307,7 @@ function Wrapper() {
 	 * @param {*[]} ...values - ES2015 tagged template values, which will be interleaved to rebuild a single string
 	 */
 	function declareDoc(strings, ...values) {
-		_nextDoc = parseDoc(_reassembleTaggedTemplate(strings, values), {sloppy: true});
+		_nextDoc = _reassembleTaggedTemplate(strings, values);
 	};
 
 	/**
@@ -367,6 +400,27 @@ function Wrapper() {
 		return _routerNames.get(_facades.get(router) || router);
 	};
 
+	/**
+	 * Get the unambiguous index ("serial number") for this router
+	 * @public
+	 * @param {Router} router - the router you want to get the index for
+	 * @returns {integer|null} - the unique index number for this router, or null if this router hasn't been seen before
+	 */
+	function getRouterIndex(router) {
+		const index = _routers.indexOf(_facades.get(router) || router);
+		return (index > -1) ? index : null;
+	};
+
+	/**
+	 * Get the router by its index
+	 * @public
+	 * @param {integer} index - the router index you want
+	 * @returns {Router|null} - the router at that index, or null if it doesn't exist
+	 */
+	function getRouter(index) {
+		return _routers[index] || null;
+	};
+
 	return {
 		declareDoc,
 		registerRouter,
@@ -376,6 +430,8 @@ function Wrapper() {
 		wrapApp,
 		getLayerDoc,
 		getRouterName,
+		getRouterIndex,
+		getRouter,
 		dump: () => {return {routers: _routerNames, docs: _layerDocs}}
 	};
 };

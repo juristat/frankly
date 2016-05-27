@@ -20,27 +20,11 @@ limitations under the License.
 
 /** @module frankly */
 
-import Wrapper from './app-wrapper';
-import Walker from './app-walker';
-import {render, serve} from './render';
+import Wrapper from './wrapper';
+import Walker from './walker';
+import {render} from './renderer';
 
 // TODO: wrapper needs to give Routers serial numbers since they won't always be named; walker needs to refer to S/Ns
-
-/*
-	maybe, TODO, this alternative form:
-
-	app
-		.doc `
-			JSDoc here
-		`
-		.get('/', ...)
-
-		.doc `...`
-		.put('/', ...)
-
-
-	And same for app.route(), Router, etc
-*/
 
 
 /**
@@ -56,7 +40,8 @@ function Frankly() {
 		wrapApp: wrapper.wrapApp,
 		Router: wrapper.Router,
 		dump: wrapper.dump,
-		walk: walker.walk
+		walk: walker.walk,
+		render
 	};
 
 	return publicApi;

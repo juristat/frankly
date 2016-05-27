@@ -1,7 +1,7 @@
 /*!
 Project: frankly
 Author: Ben Chociej <ben.chociej@juristat.com>
-File: src/app-walker.js
+File: src/walker.js
 
 Copyright 2016 Datanalytics, Inc.
 
@@ -18,7 +18,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
+/** @module frankly/src/walker */
 
 /*
 	Battle plan.
@@ -44,7 +44,7 @@ function Walker(wrapper) {
 	// worry about: path keys regexp handle
 	function _process(layer, pathElements, emit, emitRouter) {
 		const nextElem = {
-			path: (layer._router ? undefined : layer.path) || layer.regexp || (layer.mountpath ? undefined : '/'),
+			path: (layer._router || layer.regexp) ? undefined : (layer.path || '/'),
 			mountpath: layer.mountpath,
 			regexp: layer.regexp,
 			keys: layer.keys
@@ -80,7 +80,7 @@ function Walker(wrapper) {
 					type:      'route',
 					pathChain: pathElements,
 					route:     layer.route,
-					jsdoc:     doc
+					jsdoc:     doc // TODO: sometimes this is grabbing the next method's doc!!!
 				});
 			}
 
@@ -96,13 +96,18 @@ function Walker(wrapper) {
 
 			const router = layer.stack ? layer : layer._router;
 			const name = wrapper.getRouterName(router);
+			const index = wrapper.getRouterIndex(router);
 
-			emit({
-				type:       layer._router ? 'app' : 'router',
-				pathChain:  pathElements,
-				routerName: name,
-				jsdoc:      doc
-			});
+			const item = {
+				type:        layer._router ? 'app' : 'router',
+				pathChain:   pathElements,
+				jsdoc:       doc
+			}
+
+			if(name) item.routerName = name;
+			if(index) item.routerIndex = index;
+
+			emit(item);
 
 			router.stack.forEach((layer) => _process(layer, pathElements, emit, emitRouter));
 
@@ -116,12 +121,11 @@ function Walker(wrapper) {
 			const name = wrapper.getRouterName(layer.handle);
 
 			emit({
-				type:       'router-ref',
-				pathChain:  pathElements,
-				routerName: name,
-				//router:     layer.handle,
-				//TODO serial number as per comment in index.js
-				jsdoc:      doc
+				type:        'router-ref',
+				pathChain:   pathElements,
+				name:        name,
+				index:       wrapper.getRouterIndex(layer.handle),
+				jsdoc:       doc
 			});
 
 			emitRouter(layer.handle);
@@ -162,15 +166,26 @@ function Walker(wrapper) {
 			done.set(current, docs);
 		}
 
-		const output = [];
+		const output = {};
 
 		done.forEach(function(docs, routerish) {
-			output.push({
-				type: routerish.stack ? 'router' : 'app',
-				name: routerish.stack ? (wrapper.getRouterName(routerish) || '<unnamed>') : '<app>',
-				docs: docs
-			});
+			const item = {
+				type:  routerish.stack ? 'router' : 'app',
+				name:  routerish.stack ? (wrapper.getRouterName(routerish) || '<unnamed>') : '<app>',
+				docs:  docs
+			}
+
+			if(item.type === 'app') {
+				if(output.app) throw new Error('multiple apps encountered');
+				output.app = item;
+			} else if(item.type === 'router') {
+				output.routers = output.routers || [];
+				item.routerIndex = wrapper.getRouterIndex(routerish)
+				output.routers.push(item);
+			}
 		});
+
+		output.routers = output.routers.sort((a, b) => a.routerIndex - b.routerIndex);
 
 		return output;
 	};
@@ -179,122 +194,3 @@ function Walker(wrapper) {
 };
 
 export default Walker;
-
-
-/*
-// THIS IS OLD AND BUSTED
-function walkEntireApp(target) {
-	const knownRouters = new Map;
-
-	const walkers = {
-		// a top level express app; has layer._router
-		app: (layer) => ({
-			nodeType: 'app',
-			app: layer._router.stack.map(walk)
-		}),
-
-		// a router is anything with a stack, generally
-		router: (layer) => {
-			let subtree = knownRouters.get(layer.handle.stack);
-			let cycle = true;
-
-			if(!subtree) {
-				cycle = false;
-				subtree = [];
-				knownRouters.set(layer.handle.stack, subtree);
-				subtree = subtree.concat(layer.handle.stack.map(walk));
-			}
-
-			// TODO: name the routers somehow
-			return {
-				nodeType: 'router',
-				path: layer.path, // routers ONLY have regexps - this will be undefined
-				regexp: layer.regexp,
-				keys: layer.keys,
-				router: subtree,
-				cycle
-			};
-		},
-
-		// a route is a Route object; it has only methods in its stack
-		route: (layer) => ({
-			nodeType: 'route',
-			path: layer.route.path,
-			regexp: layer.regexp,
-			keys: layer.keys,
-			methods: layer.route.stack.map(walk)
-		}),
-
-		// a method is a terminus in the route chain that attaches a handle to a verb such as get, post, etc
-		method: (layer) => ({
-			nodeType: 'method',
-			verb: layer.method ? layer.method : '*',
-			handle: layer.handle
-		}),
-
-		// other: everything else (middleware, ...)
-		other: (layer) => ({
-			nodeType: 'other',
-			name: layer.name,
-			handle: layer.handle
-		})
-	};
-
-	function walk(layer) {
-		if(layer._router) {
-			return walkers.app(layer);
-		} else if(layer.handle && layer.handle.stack) {
-			return walkers.router(layer);
-		} else if('method' in layer) {
-			return walkers.method(layer);
-		} else if(layer.route) {
-			return walkers.route(layer);
-		} else {
-			return walkers.other(layer);
-		}
-	};
-
-	return walk(target);
-}
-
-// experimental
-function getRouteList(api) {
-	const walkers = {};
-	const routes = [];
-
-	walkers.app = (node) => {
-		const pathElements = ['/'];
-		const params = [];
-		node.app.forEach((child) => walkers[child.nodeType](pathElements.slice(), params.slice(), child));
-	}
-
-	walkers.router = (pathElements, params, node) => {
-		pathElements.push(node.path || node.regexp);
-		params = params.concat(node.keys);
-		node.router.forEach((child) => walkers[child.nodeType](pathElements.slice(), params.slice(), child));
-	};
-
-	walkers.route = (pathElements, params, node) => {
-		pathElements.push(node.path || node.regexp);
-		params = params.concat(node.keys);
-		node.methods.forEach((child) => walkers[child.nodeType](pathElements.slice(), params.slice(), child));
-	};
-
-	walkers.method = (pathElements, params, node) => {
-		const method = {
-			params,
-			verb: node.verb,
-			handle: node.handle
-		};
-
-		routes.push(pathElements.concat(method));
-	};
-
-	walkers.other = (pathElements, params, node) => {
-		return; // TODO
-	};
-
-	walkers.app(api);
-	return routes;
-}
-*/
