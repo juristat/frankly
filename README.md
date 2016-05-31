@@ -80,7 +80,11 @@ var widgetRouter = express.Router('widgetRouter');
 
 // now use the Routers like usual:
 
+doc(['List Users',
+	'@returns {string[]} a list of usernames']);
 userRouter.get('/', listUsers);
+
+doc(['/users/ directory delegates to Users router']);
 app.use('/users/', userRouter);
 
 // etc.
