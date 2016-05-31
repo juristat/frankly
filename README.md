@@ -49,6 +49,10 @@ var frankly = require('frankly').createInstance();
 var frankly = require('frankly').default;
 
 
+// call this however you want. we use 'doc' for shorthand, you could use $ if it's available, whatever.
+var doc = frankly.declareDoc;
+
+
 // create a new express app and wrap it with frankly's instrumentation
 var app = frankly.wrapApp(express());
 
