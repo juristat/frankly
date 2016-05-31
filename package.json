@@ -52,5 +52,8 @@
   "dependencies": {
     "doctrine": "^1.2.2",
     "methods": "*"
+  },
+  "optionalDependencies": {
+    "pug": "^2.0.0-alpha8"
   }
 }

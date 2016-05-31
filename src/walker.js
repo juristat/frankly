@@ -39,6 +39,12 @@ limitations under the License.
 	3. Assemble the data structures generated from 2.B.ii. into a single report for export, rendering, etc.
 */
 
+import doctrine from 'doctrine';
+
+function _parseJsdoc(str) {
+	if(!!str) return doctrine.parse(str, {sloppy: true});
+}
+
 function Walker(wrapper) {
 	// a layer has .route, .method, .handle or .stack
 	// worry about: path keys regexp handle
@@ -58,16 +64,21 @@ function Walker(wrapper) {
 		pathElements = pathElements.concat(nextElem);
 
 		const doc = wrapper.getLayerDoc(layer);
+		const forceMethod = wrapper.isForcedMethod(layer);
 
-		if(layer.method) {
+		if(layer.method || forceMethod) {
 			// HTTP verb Layer (leaf node)
 			// emit: pathElements + layer.method + doc-if-any + method
+
+			if(forceMethod) {
+				layer = layer.route.stack[layer.route.stack.length-1];
+			}
 
 			emit({
 				type:      'method',
 				pathChain: pathElements,
 				method:    layer.method,
-				jsdoc:     doc
+				jsdoc:     _parseJsdoc(doc)
 			});
 
 		} else if(!!layer.route && typeof layer.route !== 'function') {
@@ -80,7 +91,7 @@ function Walker(wrapper) {
 					type:      'route',
 					pathChain: pathElements,
 					route:     layer.route,
-					jsdoc:     doc // TODO: sometimes this is grabbing the next method's doc!!!
+					jsdoc:     _parseJsdoc(doc)
 				});
 			}
 
@@ -101,7 +112,7 @@ function Walker(wrapper) {
 			const item = {
 				type:        layer._router ? 'app' : 'router',
 				pathChain:   pathElements,
-				jsdoc:       doc
+				jsdoc:       _parseJsdoc(doc)
 			}
 
 			if(name) item.routerName = name;
@@ -125,7 +136,7 @@ function Walker(wrapper) {
 				pathChain:   pathElements,
 				name:        name,
 				index:       wrapper.getRouterIndex(layer.handle),
-				jsdoc:       doc
+				jsdoc:       _parseJsdoc(doc)
 			});
 
 			emitRouter(layer.handle);
@@ -138,7 +149,7 @@ function Walker(wrapper) {
 				type:      'middleware',
 				pathChain: pathElements,
 				handle:    layer.handle,
-				jsdoc:     doc
+				jsdoc:     _parseJsdoc(doc)
 			});
 		}
 	};

@@ -60,6 +60,9 @@ function Wrapper() {
 	/** map of Layer objects to their JSDoc strings @private */
 	const _layerDocs = new Map;
 
+	/** map of Layer objects that must be considered methods instead of routes @private */
+	const _forceMethod = new Set;
+
 	/** list of all known Router; _routers.indexOf() is used to unambiguously reference a Router later @private */
 	const _routers = [];
 
@@ -81,6 +84,10 @@ function Wrapper() {
 	 */
 	function _reassembleTaggedTemplate(strings, values) {
 		if(typeof strings === 'string') return strings;
+
+		if(strings.length > 1 && !values) {
+			return strings.join('\n');
+		}
 
 		const boundaries = values.length;
 		let result = '';
@@ -124,12 +131,12 @@ function Wrapper() {
 			if(args.length >= 2 && _nextDoc) {
 				const stack = _getStack(routerish);
 				assert(stack.length > 0, 'stack is empty');
-
 				// target Layer is the latest Layer on the stack, which has one or more method handler Layer children
 				const thisLayer = stack[stack.length - 1];
 
 				assert(thisLayer && thisLayer.route && thisLayer.route.stack, 'simple method layer has no stack');
 
+				_forceMethod.add(thisLayer);
 				_layerDocs.set(thisLayer, _nextDoc);
 				_nextDoc = null;
 			}
@@ -246,7 +253,6 @@ function Wrapper() {
 	 */
 	function _hookRouteMethods(facade, original) {
 		facade.route = function(...args) {
-			console.error('facade.route');
 			const origRoute = original.route.apply(original, args);
 			const facadeRoute = Object.create(origRoute);
 
@@ -421,6 +427,16 @@ function Wrapper() {
 		return _routers[index] || null;
 	};
 
+	/**
+	 * See if a Layer should forcefully be considered a method (rather than a Route)
+	 * @public
+	 * @param {Layer} layer - the Layer of concern
+	 * @returns {true|false} - whether the Layer must be considered a method
+	 */
+	function isForcedMethod(layer) {
+		return _forceMethod.has(layer);
+	};
+
 	return {
 		declareDoc,
 		registerRouter,
@@ -432,7 +448,7 @@ function Wrapper() {
 		getRouterName,
 		getRouterIndex,
 		getRouter,
-		dump: () => {return {routers: _routerNames, docs: _layerDocs}}
+		isForcedMethod
 	};
 };
 

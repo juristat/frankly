@@ -64,7 +64,7 @@ doc `
 	Says 'hello world'.
 	@returns 'hello world'
 `
-app.get('/',         (req, res, next) => next(), (req, res) => res.send('hello world'));
+app.get('/brap',         (req, res, next) => next(), (req, res) => res.send('hello world'));
 
 doc `
 	Posts something?

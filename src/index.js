@@ -39,7 +39,9 @@ function Frankly() {
 		declareDoc: wrapper.declareDoc,
 		wrapApp: wrapper.wrapApp,
 		Router: wrapper.Router,
-		dump: wrapper.dump,
+		hookRouterCtor: wrapper.hookRouterCtor,
+		unhookRouterCtor: wrapper.unhookRouterCtor,
+		registerRouter: wrapper.registerRouter,
 		walk: walker.walk,
 		render
 	};
