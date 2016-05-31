@@ -1,6 +1,8 @@
 #frankly
 stupid simple docs for your express thing
 
+it's jsdoc, see usejsdoc.org
+
 ##how to setup your app
 ###ES6 (`import`) examples
 ```javascript
