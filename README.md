@@ -88,12 +88,22 @@ doc(['/users/ directory delegates to Users router']);
 app.use('/users/', userRouter);
 
 // etc.
-
 ```
+
+##what all can you document
+* App methods: `app.get(path, handler)`, `app.put(path, handler)`, etc.
+* Routers: `frankly.Router(name)` or `express.Router(name)` if configured
+* Router methods: `someRouter.get(path, handler)`, etc.
+* Routes and their methods: `app.route(path).get(handler).put(handler) // etc`
+* Middlewares: `app.use(middleware)`
+
+You can document all the HTTP verbs the express knows about (based on the 'methods' npm package), as well as `.all()`.
+
+
 ##how to make docs happen
 ###TODO: make the API less clunky
 ```javascript
-var htmlRenderer = require('frankly/src/renderers/html');
+var htmlRenderer = require('frankly/lib/renderers/html');
 var docJson      = frankly.walk(app);
 
 frankly.render(docJson, htmlRenderer('/path/to/output/'));
