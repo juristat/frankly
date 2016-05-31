@@ -63,7 +63,7 @@ var app = frankly.wrapApp(express());
 doc(['Users routes']);
 var userRouter = frankly.registerRouter(express.Router(), 'userRouter');
 
-// form 2
+// form 2 (*preferred*)
 doc(['Groups routes']);
 var groupRouter = frankly.Router('groupRouter');
 
