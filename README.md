@@ -3,7 +3,7 @@ stupid simple docs for your express thing
 
 ##how to setup your app
 ###ES6 (`import`) examples
-```
+```javascript
 import frankly, {declareDoc as doc} from 'frankly';
 import express from 'express';
 
@@ -28,7 +28,7 @@ app.get('/', (req, res) => res.send('Hello, world!'));
 app.route('/widgets/')
 	.doc `
 		List widgets
-		@returns {string[]} a list of widget names`
+		@returns {string[]} a list of widget names
 	`
 	.get((req, res) => res.send(widgetList))
 
@@ -40,7 +40,7 @@ app.route('/widgets/')
 ```
 
 ###non-ES6 (`require`) examples
-```
+```javascript
 var express = require('express');
 
 
@@ -82,10 +82,9 @@ app.use('/users/', userRouter);
 // etc.
 
 ```
-
 ##how to make docs happen
 ###TODO: make the API less clunky
-```
+```javascript
 var htmlRenderer = require('frankly/src/renderers/html');
 var docJson      = frankly.walk(app);
 
